@@ -1,16 +1,27 @@
 package com.example.CRUD.repository;
 
 import com.example.CRUD.entity.UserEntity;
+import com.example.CRUD.enumeration.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.jpa.repository.Query;
-
-import java.util.Optional;
+import java.util.List;
 
 
 @Repository
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
-    @Query("SELECT u FROM UserEntity u WHERE u.phoneNumber = :phoneNumber")
-    Optional<UserEntity> findUserByPhoneNumber(@Param("phoneNumber") String phoneNumber);
+
+    List<UserEntity> findByStatus(UserStatus status);
+    // Search by name, email, phone, or unique code (for BOTH case)
+    Page<UserEntity> findByNameContainingIgnoreCaseOrEmailIdContainingIgnoreCaseOrPhoneNumberStartingWithOrUniqueCodeStartingWithIgnoreCase(
+            String name, String emailId, String phoneNumber, String uniqueCode, Pageable pageable);
+    Page<UserEntity> findByStatusAndNameContainingIgnoreCaseOrStatusAndEmailIdContainingIgnoreCaseOrStatusAndPhoneNumberStartingWithOrStatusAndUniqueCodeStartingWithIgnoreCase(
+            UserStatus status1, String name,
+            UserStatus status2, String email,
+            UserStatus status3, String phone,
+            UserStatus status4, String uniqueCode,
+            Pageable pageable);
+    boolean existsByPhoneNumber(String phoneNumber);
+    boolean existsByEmailId(String emailId);
 }

@@ -35,12 +35,12 @@ public class UserEntity {
     @Column(nullable = false, unique = true)
     private String emailId;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true, updatable = false)
     private String uniqueCode;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserStatus status;
+    private UserStatus status = UserStatus.ACTIVE;
 
     private String createdBy;
     @CreatedDate

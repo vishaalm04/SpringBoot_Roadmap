@@ -6,13 +6,14 @@ import com.example.CRUD.dto.UserDTO;
 import com.example.CRUD.dto.UserListDTO;
 import com.example.CRUD.exception.DuplicateKeyException;
 import com.example.CRUD.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("${api.prefix}/users")
 public class UserController {
 
     @Autowired
@@ -30,32 +31,33 @@ public class UserController {
 
 
     @PostMapping
-    public ApiResponseDTO createUser(@RequestBody UserDTO user) throws DuplicateKeyException {
-        return  userService.createUser(user);
+    public ApiResponseDTO createUser( @Valid @RequestBody UserDTO user,
+                                      @RequestHeader("CreatedBy") String createdBy)  throws DuplicateKeyException {
+        return  userService.createUser(user,createdBy);
     }
 
     @DeleteMapping("/{id}")
-    public  ApiResponseDTO deleteUser(@PathVariable Long id) {
-        return userService.deleteUser(id);
+    public  ApiResponseDTO deleteUser(@PathVariable Long id,
+                                      @RequestHeader("UpdatedBy") String updatedBy) {
+        return userService.deleteUser(id,updatedBy);
     }
 
     @PutMapping("/{id}")
-    public ApiResponseDTO updateUser(@PathVariable Long id, @RequestBody UserDTO user) throws DuplicateKeyException {
-        return userService.updateUser(id, user);
+    public ApiResponseDTO updateUser(@PathVariable Long id,
+                                     @RequestBody UserDTO user,
+                                     @RequestHeader("UpdatedBy") String updatedBy) throws DuplicateKeyException {
+        return userService.updateUser(id, user,updatedBy);
     }
 
     @GetMapping("/search")
     public UserListDTO searchUsers(
+
             @RequestParam String search,
             @RequestParam(required = false, defaultValue = "BOTH") String status,
             @RequestParam(required = false, defaultValue = "ASC") String sortBy,
             @RequestParam(required = false, defaultValue = "0") int page,
-            @RequestParam(required = false) Integer size)
+            @RequestParam(required = false,defaultValue = "10") Integer size)
     {
-
-        if(size==0){
-            size = Integer.MAX_VALUE;
-        }
         return userService.searchUsers(search, status,sortBy,page,size);
     }
 

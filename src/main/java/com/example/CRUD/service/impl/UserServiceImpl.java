@@ -1,5 +1,6 @@
 package com.example.CRUD.service.impl;
 
+import com.example.CRUD.constants.ErrorConstants;
 import com.example.CRUD.constants.ResponseConstants;
 import com.example.CRUD.dto.ApiResponseDTO;
 import com.example.CRUD.dto.UserDTO;
@@ -11,12 +12,16 @@ import com.example.CRUD.exception.InvalidDataException;
 import com.example.CRUD.exception.UserNotFoundException;
 import com.example.CRUD.mapper.UserMapper;
 import com.example.CRUD.repository.UserRepository;
+import com.example.CRUD.repository.UserSpecification;
 import com.example.CRUD.service.UserService;
+import com.example.CRUD.validation.UserBasicValidator;
+import com.example.CRUD.validation.UserBusinessValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 
 import org.springframework.stereotype.Service;
@@ -33,34 +38,28 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private UserMapper userMapper;
 
+
+    @Autowired
+    private UserBasicValidator userBasicValidator;
+
+    @Autowired
+    private UserBusinessValidator userBusinessValidator;
+
     @Override
-    public ApiResponseDTO createUser(UserDTO user) throws DuplicateKeyException {
+    public ApiResponseDTO createUser(UserDTO user,String createdBy) throws DuplicateKeyException {
 
-        if (user.getPhoneNumber() == null || user.getPhoneNumber().trim().isEmpty()) {
-            throw new InvalidDataException("Phone Number cannot be null or empty.");
-        }
-        if (user.getName() == null || user.getName().trim().isEmpty()) {
-            throw new InvalidDataException("Name cannot be null or empty.");
-        }
-        if (user.getEmailId() == null || user.getEmailId().trim().isEmpty()) {
-            throw new InvalidDataException("Email ID cannot be null or empty.");
-        }
-
-        if (userRepository.existsByPhoneNumber(user.getPhoneNumber())) {
-            throw new DuplicateKeyException("User with given Phone Number already exists.");
-        }
-        if (userRepository.existsByEmailId(user.getEmailId())) {
-            throw new DuplicateKeyException("User with given Email ID already exists.");
-        }
-
+        userBasicValidator.validateUser(user);
+        userBusinessValidator.validateUniqueConstraints(user);
         try {
             UserEntity userEntity = userMapper.toEntity(user);
             userEntity.setUniqueCode(generateUniqueCode());
             userEntity.setStatus(UserStatus.ACTIVE);
+            userEntity.setCreatedBy(createdBy);
+            userEntity.setUpdatedBy(createdBy);
             userRepository.save(userEntity);
             return new ApiResponseDTO(HttpStatus.OK.value(), ResponseConstants.USER_CREATED);
         } catch (Exception e) {
-            throw new InvalidDataException("An unexpected error occurred while creating the user.");
+            throw new InvalidDataException(ErrorConstants.USER_CREATION_ERROR);
         }
     }
 
@@ -70,37 +69,31 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public ApiResponseDTO updateUser(Long id, UserDTO user) throws DuplicateKeyException {
+    public ApiResponseDTO updateUser(Long id, UserDTO user,String updatedBy) throws DuplicateKeyException {
         Optional<UserEntity> optionalUser = userRepository.findById(id);
-        if (optionalUser.isPresent()) {
-            UserEntity userEntity = optionalUser.get();
-            if (userRepository.existsByPhoneNumber(user.getPhoneNumber())) {
-                throw new DuplicateKeyException("User with given Phone Number already exists.");
-            }
-            if (userRepository.existsByEmailId(user.getEmailId())) {
-                throw new DuplicateKeyException("User with given Email ID already exists.");
-            }
-            userMapper.updateEntityFromDTO(user, userEntity);
-            userEntity.setUpdatedBy("user");
-            userRepository.save(userEntity);
-            return new ApiResponseDTO(HttpStatus.OK.value(), ResponseConstants.USER_UPDATED);
-        } else {
-            throw new UserNotFoundException("User Not Found");
+
+        if (optionalUser.isEmpty()) {
+            throw new UserNotFoundException(String.format(ErrorConstants.USER_NOT_FOUND,id));
         }
+
+        userBusinessValidator.validateUniqueConstraintsForUpdate(id, user);
+        UserEntity userEntity = optionalUser.get();
+        userMapper.updateEntityFromDTO(user, userEntity);
+        userEntity.setUpdatedBy(updatedBy);
+        userRepository.save(userEntity);
+
+        return new ApiResponseDTO(HttpStatus.OK.value(), ResponseConstants.USER_UPDATED);
     }
 
     @Override
-    public  ApiResponseDTO deleteUser(Long id) {
+    public  ApiResponseDTO deleteUser(Long id,String updatedBy) {
     UserEntity userEntity = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("User with ID " + id + " not found"));
+            .orElseThrow(() -> new UserNotFoundException(String.format(ErrorConstants.USER_NOT_FOUND, id)));
 
     userEntity.setStatus(UserStatus.INACTIVE);
-    userEntity.setUpdatedBy("user");
+    userEntity.setUpdatedBy(updatedBy);
     userRepository.save(userEntity);
     return new ApiResponseDTO(HttpStatus.OK.value(), ResponseConstants.USER_DELETED);
-
-
-
 }
     @Override
     public List<UserDTO> getAllUsers() {
@@ -113,18 +106,25 @@ public class UserServiceImpl implements UserService {
     public UserDTO getUserById(Long id) {
         UserEntity userEntity = userRepository.findById(id)
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE) // Ensure user is active
-                .orElseThrow(() -> new UserNotFoundException("User with ID " + id + " not found or inactive"));
+                .orElseThrow(() -> new UserNotFoundException(String.format(ErrorConstants.USER_INACTIVE_OR_NOT_FOUND, id)));
 
         return userMapper.toDTO(userEntity);
     }
     @Override
     public UserListDTO searchUsers(String searchTerm, String status, String sortBy, int page, int size) {
-        Sort sort = sortBy.equalsIgnoreCase("DESC")
-                ? Sort.by(Sort.Direction.DESC, "name")
-                : Sort.by(Sort.Direction.ASC, "name");
+
+        if (!status.equalsIgnoreCase(UserStatus.ACTIVE.getValue()) &&
+                !status.equalsIgnoreCase(UserStatus.INACTIVE.getValue()) &&
+                !status.equalsIgnoreCase(ResponseConstants.USER_STATUS_BOTH)) {
+            throw new IllegalArgumentException(String.format(ErrorConstants.INVALID_FILTER_OPTION, status));
+        }
+
+        Sort sort = sortBy.equalsIgnoreCase(ResponseConstants.DESCENDING)
+                ? Sort.by(Sort.Direction.DESC, ResponseConstants.SORT_BY_NAME)
+                : Sort.by(Sort.Direction.ASC, ResponseConstants.SORT_BY_NAME);
 
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<UserEntity> userEntities;
+       /* Page<UserEntity> userEntities;
         if (status.equalsIgnoreCase("ACTIVE")) {
             userEntities = userRepository.findByStatusAndNameContainingIgnoreCaseOrStatusAndEmailIdContainingIgnoreCaseOrStatusAndPhoneNumberStartingWithOrStatusAndUniqueCodeStartingWithIgnoreCase(
                     UserStatus.ACTIVE, searchTerm,
@@ -142,7 +142,10 @@ public class UserServiceImpl implements UserService {
         } else { // BOTH (default case)
             userEntities = userRepository.findByNameContainingIgnoreCaseOrEmailIdContainingIgnoreCaseOrPhoneNumberStartingWithOrUniqueCodeStartingWithIgnoreCase(
                     searchTerm, searchTerm, searchTerm, searchTerm, pageable);
-        }
+        }*/
+        Specification<UserEntity> spec = UserSpecification.filterUsers(searchTerm, status);
+        Page<UserEntity> userEntities = userRepository.findAll(spec, pageable);
+
         UserListDTO userListDTO = new UserListDTO();
         userListDTO.setOffset(String.valueOf(size));
         userListDTO.setLimit(String.valueOf(userEntities.getNumberOfElements()));

@@ -7,11 +7,11 @@ import java.util.List;
 
 
 public interface UserService {
-    ApiResponseDTO createUser(UserDTO user) throws DuplicateKeyException;
+    ApiResponseDTO createUser(UserDTO user,String createdBy) throws DuplicateKeyException;
 
-    ApiResponseDTO updateUser(Long id, UserDTO user) throws DuplicateKeyException;
+    ApiResponseDTO updateUser(Long id, UserDTO user,String updatedBy) throws DuplicateKeyException;
 
-    ApiResponseDTO deleteUser(Long id);
+    ApiResponseDTO deleteUser(Long id,String updatedBy);
 
     List<UserDTO> getAllUsers();
 

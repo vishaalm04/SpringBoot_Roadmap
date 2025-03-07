@@ -1,9 +1,8 @@
 package com.example.CRUD.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
+import java.util.List;
 import lombok.*;
 
-import java.util.List;
 
 @Getter
 @Setter

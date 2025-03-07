@@ -14,7 +14,8 @@ public class UserMapper {
                 .emailId(user.getEmailId())
                 .uniqueCode(user.getUniqueCode())
                 .phoneNumber(user.getPhoneNumber())
-                .status(user.getStatus().getStatus())
+                .status(user.getStatus().getValue())
+                .createdBy(user.getCreatedBy())
                 .updatedBy(user.getUpdatedBy())
                 .build();
     }
@@ -23,17 +24,30 @@ public class UserMapper {
         entity.setName(user.getName());
         entity.setPhoneNumber(user.getPhoneNumber());
         entity.setEmailId(user.getEmailId());
-        entity.setCreatedBy("user");
-        entity.setUpdatedBy("admin");
+        entity.setCreatedBy(user.getCreatedBy());
+        entity.setUpdatedBy(user.getCreatedBy());
         return entity;
     }
 
-    public  void updateEntityFromDTO(UserDTO user, UserEntity entity) {
-        entity.setName(user.getName());
-        entity.setPhoneNumber(user.getPhoneNumber());
-        entity.setEmailId(user.getEmailId());
-        entity.setUniqueCode(user.getUniqueCode());
-        entity.setStatus(user.getStatus().equalsIgnoreCase("Active") ? UserStatus.ACTIVE : UserStatus.INACTIVE);
-        entity.setUpdatedBy("admin");
+    public void updateEntityFromDTO(UserDTO user, UserEntity entity) {
+        if (user.getName() != null) {
+            entity.setName(user.getName());
+        }
+        if (user.getPhoneNumber() != null) {
+            entity.setPhoneNumber(user.getPhoneNumber());
+        }
+        if (user.getEmailId() != null) {
+            entity.setEmailId(user.getEmailId());
+        }
+        if (user.getUniqueCode() != null) {
+            entity.setUniqueCode(user.getUniqueCode());
+        }
+        if (user.getStatus() != null) {
+            entity.setStatus(user.getStatus().equalsIgnoreCase(UserStatus.ACTIVE.getValue())
+                    ? UserStatus.ACTIVE
+                    : UserStatus.INACTIVE);
+        }
+        entity.setUpdatedBy(user.getUpdatedBy());
     }
+
 }
